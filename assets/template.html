@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{TITLE}}</title>
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-secondary: #5a6c7d;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --border: #e2e8f0;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a2e;
+      --card-bg: #252540;
+      --text: #e0e0e0;
+      --text-secondary: #a0a0b0;
+      --accent: #60a5fa;
+      --accent-light: rgba(96, 165, 250, 0.1);
+      --border: #3a3a5c;
+      --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+    }
+    .page-section img { opacity: 0.92; }
+    .page-topic { color: #e0e0e0; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* Sidebar TOC */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 280px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; z-index: 100; padding: 24px 0;
+    transform: translateX(-100%); transition: transform .25s ease;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar h2 {
+    font-size: 1rem; padding: 0 20px 12px; color: var(--text-secondary);
+    border-bottom: 1px solid var(--border); margin-bottom: 8px;
+  }
+  .sidebar a {
+    display: block; padding: 6px 20px; font-size: .875rem;
+    color: var(--text); text-decoration: none; border-left: 3px solid transparent;
+  }
+  .sidebar a:hover, .sidebar a.active { color: var(--accent); background: var(--accent-light); border-left-color: var(--accent); }
+
+  /* Overlay */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 99; }
+  .overlay.show { display: block; }
+
+  /* Toggle button */
+  .toc-toggle {
+    position: fixed; top: 16px; left: 16px; z-index: 200;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+    width: 40px; height: 40px; cursor: pointer; font-size: 1.2rem;
+    box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Main content */
+  .main { max-width: 900px; margin: 0 auto; padding: 48px 24px 96px; }
+  .main h1 { font-size: 1.75rem; margin-bottom: 32px; text-align: center; }
+
+  .page-section {
+    background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+    margin-bottom: 40px; overflow: hidden;
+  }
+  .page-section img { width: 100%; display: block; border-bottom: 1px solid var(--border); }
+  .page-section .explanation { padding: 28px 32px; }
+
+  .page-number {
+    display: inline-block; background: var(--accent); color: #fff;
+    font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    margin-bottom: 12px;
+  }
+  .page-topic { font-size: 1.15rem; font-weight: 700; margin-bottom: 14px; color: #1e293b; }
+
+  .detail-block { margin-bottom: 18px; }
+  .detail-label {
+    font-size: .8rem; font-weight: 600; color: var(--accent); text-transform: uppercase;
+    letter-spacing: .5px; margin-bottom: 4px;
+  }
+  .detail-content { font-size: .95rem; color: var(--text-secondary); }
+  .detail-content ul { padding-left: 20px; }
+  .detail-content li { margin-bottom: 4px; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .main { padding: 32px 16px 64px; }
+    .page-section .explanation { padding: 20px; }
+  }
+
+  /* Summary */
+  .summary-section {
+    background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 36px 40px; margin-top: 20px;
+    border-left: 4px solid var(--accent);
+  }
+  .summary-section h2 { font-size: 1.3rem; margin-bottom: 6px; }
+  .summary-section .summary-subtitle { font-size: .85rem; color: var(--text-secondary); margin-bottom: 20px; }
+  .summary-point { margin-bottom: 14px; }
+  .summary-point .point-title { font-weight: 700; font-size: 1rem; margin-bottom: 3px; }
+  .summary-point .point-desc { font-size: .9rem; color: var(--text-secondary); }
+  .summary-point .point-links { font-size: .8rem; margin-top: 2px; }
+  .summary-point .point-links a { color: var(--accent); margin-right: 8px; text-decoration: none; }
+  .summary-point .point-links a:hover { text-decoration: underline; }
+
+  /* Print */
+  @media print {
+    .sidebar, .overlay, .toc-toggle { display: none !important; }
+    .main { max-width: 100%; }
+    .page-section { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
+  }
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay"></div>
+<button class="toc-toggle" id="tocToggle" title="目录">☰</button>
+
+<nav class="sidebar" id="sidebar">
+  <h2>目录</h2>
+  {{TOC}}
+</nav>
+
+<main class="main">
+  <h1>{{TITLE}}</h1>
+  {{CONTENT}}
+  {{SUMMARY}}
+</main>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const toggle = document.getElementById('tocToggle');
+  function open() { sidebar.classList.add('open'); overlay.classList.add('show'); }
+  function close() { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
+  toggle.addEventListener('click', () => sidebar.classList.contains('open') ? close() : open());
+  overlay.addEventListener('click', close);
+  document.querySelectorAll('.sidebar a').forEach(a => a.addEventListener('click', close));
+
+  // Scroll-spy: highlight current page in sidebar TOC
+  const pageSections = document.querySelectorAll('.page-section');
+  const tocLinks = document.querySelectorAll('.sidebar a[href^="#page-"]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const pageId = entry.target.id;
+        tocLinks.forEach(link => {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + pageId);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  pageSections.forEach(section => observer.observe(section));
+</script>
+
+</body>
+</html>
