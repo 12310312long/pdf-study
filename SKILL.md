@@ -6,7 +6,7 @@ description: |
   "convert this PDF to study notes", "生成学习笔记", "帮我复习这个课件", "讲解这个PDF", "/pdf-study",
   or anytime a user uploads/mentions a PDF and asks for explanations, study aids, or learning materials.
   Works globally — not tied to any specific project directory.
-compatibility: Requires pypdfium2, pdfplumber, Pillow. GPU acceleration requires torch + transformers (auto-fallback to CPU if unavailable). Install: pip install pypdfium2 pdfplumber Pillow
+compatibility: "Requires pypdfium2, pdfplumber, Pillow. GPU acceleration requires torch + transformers (auto-fallback to CPU if unavailable). Install: pip install pypdfium2 pdfplumber Pillow"
 ---
 
 # PDF Study — 课件复习助手
