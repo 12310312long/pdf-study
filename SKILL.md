@@ -11,7 +11,7 @@ compatibility: Requires pypdfium2, pdfplumber, Pillow. GPU acceleration requires
 
 # PDF Study — 课件复习助手
 
-Turn a PDF courseware into an interactive HTML study guide with per-page screenshots and teacher-style explanations in Chinese.
+Turn a PDF courseware into an interactive HTML study guide (plus optional Markdown export) with per-page screenshots and teacher-style explanations in Chinese.
 
 ## Output Structure
 
@@ -20,15 +20,16 @@ Create a folder next to the original PDF:
 ```
 <original_name>_study/
 ├── <original_name>_study.html    # Final HTML (images loaded locally, not base64)
+├── <original_name>_study.md      # Markdown version (same content, portable)
 ├── images/
 │   ├── page_000.png
 │   └── ...
 └── data/
     ├── extracted_text.txt
     ├── page_text.json
-    ├── image_descriptions.json   # GPU-generated (NEW)
+    ├── image_descriptions.json   # GPU-generated
     ├── analyses.json
-    └── pages_text/               # Per-page text files (NEW)
+    └── pages_text/               # Per-page text files
 ```
 
 ## Workflow (target: under 3 minutes for 50-page PDF)
@@ -80,22 +81,22 @@ Options: `--device cpu` to force CPU, `--skip-text-heavy` to skip pages with >30
 
 | Type | Detection | Minimum Sections | Minimum Total Chars |
 |------|-----------|-----------------|---------------------|
-| simple | Title, divider, outline, thank-you, blank | 2 (内容讲解 + 背景知识) | 300 |
-| text | Mainly text, no figures/diagrams | 2 (内容讲解 + one of 背景知识/补充说明) | 350 |
-| figure | Has diagrams, charts, screenshots, photos | 3 (内容讲解 + 图表详解 + one other) | 500 |
-| math | Has formulas, equations | 2 (内容讲解 + 公式解读) | 400 |
-| mixed | Has both figures AND formulas | 4 (内容讲解 + 图表详解 + 公式解读 + one other) | 600 |
+| simple | Title, divider, outline, thank-you, blank | 2 (内容讲解 + 背景知识) | 400 |
+| text | Mainly text, no figures/diagrams | 2 (内容讲解 + 背景知识/补充说明) | 500 |
+| figure | Has diagrams, charts, screenshots, photos | 3 (内容讲解 + 图表详解 + one other) | 700 |
+| math | Has formulas, equations | 2 (内容讲解 + 公式解读) | 550 |
+| mixed | Has both figures AND formulas | 4 (内容讲解 + 图表详解 + 公式解读 + one other) | 800 |
 
 **Section types — use only what fits the page:**
 
 | Section | When Required | Content Guidelines |
 |---------|---------------|-------------------|
-| 内容讲解 | ALWAYS | Core explanation in Chinese. 100-250 chars. |
-| 图表详解 | REQUIRED for figure/mixed pages | Describe position, visual elements, significance of each figure/diagram. Reference the image description. 100-200 chars. |
-| 公式解读 | REQUIRED for math/mixed pages | Explain each formula's meaning, variables, and intuition. 100-200 chars. |
-| 背景知识 | Recommended for text/simple pages | Broader context, historical background, real-world connections. 80-150 chars. |
-| 重点标注 | Optional — exam-critical points only | Use sparingly (max 2 pages per batch). 60-120 chars. |
-| 补充说明 | Optional — nuances, misconceptions | Use when there is a subtle point worth clarifying. 80-150 chars. |
+| 内容讲解 | ALWAYS | Core explanation in Chinese. 200-400 chars. Provide in-depth analysis, not just rephrasing the slide. |
+| 图表详解 | REQUIRED for figure/mixed pages | Describe position, visual elements, significance of each figure/diagram. Reference the image description. 150-300 chars. |
+| 公式解读 | REQUIRED for math/mixed pages | Explain each formula's meaning, variables, and intuition. 150-300 chars. |
+| 背景知识 | Recommended for text/simple pages | Broader context, historical background, real-world connections. 120-250 chars. |
+| 重点标注 | Optional — exam-critical points only | Use sparingly (max 2 pages per batch). 80-150 chars. |
+| 补充说明 | Optional — nuances, misconceptions | Use when there is a subtle point worth clarifying. 120-250 chars. |
 
 **Output format (page numbers MUST be 1-indexed):**
 
@@ -103,9 +104,9 @@ Options: `--device cpu` to force CPU, `--skip-text-heavy` to skip pages with >30
 [
   {
     "page": 1,
-    "overview": "页面概览（2-3句中文，60-100字）",
+    "overview": "页面概览（2-4句中文，80-150字）",
     "sections": [
-      ["内容讲解", "核心解释...（100-250字）"],
+      ["内容讲解", "核心解释...（200-400字）"],
       ...
     ]
   }
@@ -113,7 +114,7 @@ Options: `--device cpu` to force CPU, `--skip-text-heavy` to skip pages with >30
 ```
 
 **OUTPUT VALIDATION before writing each batch:**
-1. Every page has overview (60-100 chars)
+1. Every page has overview (80-150 chars)
 2. Every page meets its type's minimum section count
 3. Every page meets its type's minimum total character count
 4. NO ASCII double quotes (`"`) inside string values — use「」instead
@@ -126,7 +127,19 @@ Options: `--device cpu` to force CPU, `--skip-text-heavy` to skip pages with >30
 python "<skill-dir>/scripts/build_html.py" "$OUT_DIR"
 ```
 
-This script:
+### Step 3b (可选): Build Markdown
+
+在 HTML 生成之后（或直接基于 `data/batch_*.json`）输出一份 Markdown 版本：
+
+```bash
+python "<skill-dir>/scripts/build_md.py" "$OUT_DIR"
+```
+
+Markdown 文件与 HTML 文件同级，位于 `<original_name>_study.md`，包含相同的逐页讲解、图片引用和课程总结，适合在 Obsidian、GitHub 等 Markdown 编辑器中查看。
+
+### Step 3 补充: build_html.py 做了什么
+
+`build_html.py` 的步骤：
 1. Merges all `data/batch_*.json` into `data/analyses.json`
 2. Validates page quality — warns if any non-skip page has <200 chars of analysis
 3. Reads the template from `<skill-dir>/assets/template.html`
@@ -135,7 +148,7 @@ This script:
 
 ### Step 4: Report
 
-Tell the user: output folder, page count, total analysis sections, any quality warnings, and that the study guide is ready.
+Tell the user: output folder, page count, total analysis sections, any quality warnings, and that both HTML and Markdown study guides are ready (if Markdown was generated).
 
 ## Analysis Guidelines
 
@@ -145,11 +158,11 @@ Tell the user: output folder, page count, total analysis sections, any quality w
 
 | Page Type | Sections | Total Chars |
 |-----------|----------|-------------|
-| Cover/title/outline/divider | 2 (内容讲解 + 背景知识) | ≥300 |
-| Text-only content | 2 (内容讲解 + 背景知识/补充说明) | ≥350 |
-| Content with figures | 3 (内容讲解 + 图表详解 + one other) | ≥500 |
-| Math/formula pages | 2 (内容讲解 + 公式解读) | ≥400 |
-| Mixed (figures + math) | 4 (all four core sections) | ≥600 |
+| Cover/title/outline/divider | 2 (内容讲解 + 背景知识) | ≥400 |
+| Text-only content | 2 (内容讲解 + 背景知识/补充说明) | ≥500 |
+| Content with figures | 3 (内容讲解 + 图表详解 + one other) | ≥700 |
+| Math/formula pages | 2 (内容讲解 + 公式解读) | ≥550 |
+| Mixed (figures + math) | 4 (all four core sections) | ≥800 |
 
 ## Tips
 
