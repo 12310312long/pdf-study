@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -6,165 +6,124 @@
 <title>{{TITLE}}</title>
 <style>
   :root {
-    --bg: #f8f9fa;
-    --card-bg: #ffffff;
-    --text: #2c3e50;
-    --text-secondary: #5a6c7d;
-    --accent: #2563eb;
-    --accent-light: #eff6ff;
-    --border: #e2e8f0;
-    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
-    --radius: 12px;
+    --bg: #f6f3eb;
+    --card-bg: #fffdf7;
+    --text: #1d2621;
+    --text-secondary: #59645e;
+    --accent: #b8322d;
+    --accent-2: #0f6b5f;
+    --accent-light: #f2e7d8;
+    --border: #d8d0bf;
+    --shadow: 0 8px 24px rgba(29, 34, 30, .10);
+    --radius: 8px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #1a1a2e;
-      --card-bg: #252540;
-      --text: #e0e0e0;
-      --text-secondary: #a0a0b0;
-      --accent: #60a5fa;
-      --accent-light: rgba(96, 165, 250, 0.1);
-      --border: #3a3a5c;
-      --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+      --bg: #151816;
+      --card-bg: #20241f;
+      --text: #f0ede4;
+      --text-secondary: #b9b3a6;
+      --accent: #ff756e;
+      --accent-2: #56c0ad;
+      --accent-light: rgba(255, 117, 110, .12);
+      --border: #3c423a;
+      --shadow: 0 8px 24px rgba(0, 0, 0, .28);
     }
-    .page-section img { opacity: 0.92; }
-    .page-topic { color: #e0e0e0; }
+    .page-section img { opacity: .94; background: #fff; }
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
-    background: var(--bg);
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    background:
+      linear-gradient(90deg, rgba(29, 38, 33, .035) 1px, transparent 1px),
+      linear-gradient(rgba(29, 38, 33, .035) 1px, transparent 1px),
+      var(--bg);
+    background-size: 28px 28px;
     color: var(--text);
     line-height: 1.7;
   }
-
-  /* Sidebar TOC */
   .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 280px;
+    position: fixed; left: 0; top: 0; bottom: 0; width: 300px;
     background: var(--card-bg); border-right: 1px solid var(--border);
-    overflow-y: auto; z-index: 100; padding: 24px 0;
-    transform: translateX(-100%); transition: transform .25s ease;
+    overflow-y: auto; z-index: 100; padding: 22px 0;
+    transform: translateX(-100%); transition: transform .22s ease;
   }
   .sidebar.open { transform: translateX(0); }
-  .sidebar h2 {
-    font-size: 1rem; padding: 0 20px 12px; color: var(--text-secondary);
-    border-bottom: 1px solid var(--border); margin-bottom: 8px;
-  }
-  .sidebar a {
-    display: block; padding: 6px 20px; font-size: .875rem;
-    color: var(--text); text-decoration: none; border-left: 3px solid transparent;
-  }
+  .sidebar h2 { font-size: 1rem; padding: 0 20px 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+  .sidebar a { display: block; padding: 7px 20px; font-size: .88rem; color: var(--text); text-decoration: none; border-left: 4px solid transparent; }
   .sidebar a:hover, .sidebar a.active { color: var(--accent); background: var(--accent-light); border-left-color: var(--accent); }
-
-  /* Overlay */
-  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 99; }
+  .summary-link { font-weight: 800; border-top: 1px solid var(--border); margin-top: 8px; padding-top: 12px !important; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.32); z-index: 99; }
   .overlay.show { display: block; }
-
-  /* Toggle button */
   .toc-toggle {
     position: fixed; top: 16px; left: 16px; z-index: 200;
     background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
-    width: 40px; height: 40px; cursor: pointer; font-size: 1.2rem;
+    width: 42px; height: 42px; cursor: pointer; font-size: 1.2rem;
     box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
+    color: var(--text);
   }
-
-  /* Main content */
-  .main { max-width: 900px; margin: 0 auto; padding: 48px 24px 96px; }
-  .main h1 { font-size: 1.75rem; margin-bottom: 32px; text-align: center; }
-
-  .page-section {
-    background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
-    margin-bottom: 40px; overflow: hidden;
-  }
+  .main { max-width: 980px; margin: 0 auto; padding: 50px 24px 96px; }
+  .main h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1.05; margin-bottom: 30px; text-align: center; letter-spacing: 0; }
+  .page-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 34px; overflow: hidden; }
   .page-section img { width: 100%; display: block; border-bottom: 1px solid var(--border); }
-  .page-section .explanation { padding: 28px 32px; }
-
-  .page-number {
-    display: inline-block; background: var(--accent); color: #fff;
-    font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 20px;
-    margin-bottom: 12px;
-  }
-  .page-topic { font-size: 1.15rem; font-weight: 700; margin-bottom: 14px; color: #1e293b; }
-
-  .detail-block { margin-bottom: 18px; }
-  .detail-label {
-    font-size: .8rem; font-weight: 600; color: var(--accent); text-transform: uppercase;
-    letter-spacing: .5px; margin-bottom: 4px;
-  }
-  .detail-content { font-size: .95rem; color: var(--text-secondary); }
-  .detail-content ul { padding-left: 20px; }
-  .detail-content li { margin-bottom: 4px; }
-
-  /* Responsive */
+  .page-section .explanation { padding: 26px 30px; }
+  .page-number { display: inline-block; background: var(--accent); color: #fff; font-size: .76rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; margin-bottom: 12px; }
+  .page-topic { font-size: 1.12rem; font-weight: 800; margin-bottom: 16px; color: var(--text); }
+  .detail-block { margin: 16px 0; padding-left: 14px; border-left: 4px solid var(--accent-2); }
+  .detail-label { font-size: .82rem; font-weight: 800; color: var(--accent-2); margin-bottom: 4px; }
+  .detail-content { font-size: .96rem; color: var(--text-secondary); }
+  .detail-content p { margin: 6px 0; }
+  .summary-section { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px 36px; margin-top: 20px; border: 1px solid var(--border); border-left: 5px solid var(--accent); }
+  .summary-section h2 { font-size: 1.35rem; margin-bottom: 6px; }
+  .summary-subtitle { font-size: .9rem; color: var(--text-secondary); margin-bottom: 18px; }
+  .summary-point { margin-bottom: 16px; }
+  .point-title { font-weight: 800; font-size: 1rem; margin-bottom: 4px; }
+  .point-desc { font-size: .93rem; color: var(--text-secondary); }
+  .point-links a, .summary-section a { color: var(--accent); text-decoration: none; }
+  .summary-section ul { padding-left: 22px; color: var(--text-secondary); }
   @media (max-width: 768px) {
-    .main { padding: 32px 16px 64px; }
+    .main { padding: 36px 14px 64px; }
     .page-section .explanation { padding: 20px; }
   }
-
-  /* Summary */
-  .summary-section {
-    background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
-    padding: 36px 40px; margin-top: 20px;
-    border-left: 4px solid var(--accent);
-  }
-  .summary-section h2 { font-size: 1.3rem; margin-bottom: 6px; }
-  .summary-section .summary-subtitle { font-size: .85rem; color: var(--text-secondary); margin-bottom: 20px; }
-  .summary-point { margin-bottom: 14px; }
-  .summary-point .point-title { font-weight: 700; font-size: 1rem; margin-bottom: 3px; }
-  .summary-point .point-desc { font-size: .9rem; color: var(--text-secondary); }
-  .summary-point .point-links { font-size: .8rem; margin-top: 2px; }
-  .summary-point .point-links a { color: var(--accent); margin-right: 8px; text-decoration: none; }
-  .summary-point .point-links a:hover { text-decoration: underline; }
-
-  /* Print */
   @media print {
     .sidebar, .overlay, .toc-toggle { display: none !important; }
-    .main { max-width: 100%; }
-    .page-section { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
+    .main { max-width: 100%; padding: 0; }
+    .page-section { break-inside: avoid; box-shadow: none; }
   }
 </style>
 </head>
 <body>
-
 <div class="overlay" id="overlay"></div>
 <button class="toc-toggle" id="tocToggle" title="目录">☰</button>
-
 <nav class="sidebar" id="sidebar">
   <h2>目录</h2>
   {{TOC}}
 </nav>
-
 <main class="main">
   <h1>{{TITLE}}</h1>
   {{CONTENT}}
   {{SUMMARY}}
 </main>
-
 <script>
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('overlay');
   const toggle = document.getElementById('tocToggle');
-  function open() { sidebar.classList.add('open'); overlay.classList.add('show'); }
-  function close() { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
-  toggle.addEventListener('click', () => sidebar.classList.contains('open') ? close() : open());
-  overlay.addEventListener('click', close);
-  document.querySelectorAll('.sidebar a').forEach(a => a.addEventListener('click', close));
-
-  // Scroll-spy: highlight current page in sidebar TOC
+  function openToc() { sidebar.classList.add('open'); overlay.classList.add('show'); }
+  function closeToc() { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
+  toggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeToc() : openToc());
+  overlay.addEventListener('click', closeToc);
+  document.querySelectorAll('.sidebar a').forEach(a => a.addEventListener('click', closeToc));
   const pageSections = document.querySelectorAll('.page-section');
   const tocLinks = document.querySelectorAll('.sidebar a[href^="#page-"]');
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         const pageId = entry.target.id;
-        tocLinks.forEach(link => {
-          link.classList.toggle('active', link.getAttribute('href') === '#' + pageId);
-        });
+        tocLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === '#' + pageId));
       }
     });
   }, { rootMargin: '-20% 0px -70% 0px' });
   pageSections.forEach(section => observer.observe(section));
 </script>
-
 </body>
 </html>

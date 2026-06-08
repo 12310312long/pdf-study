@@ -1,78 +1,90 @@
-# PDF Study — 课件复习助手
+# PDF Study - 课件复习助手
 
-> Turn PDF courseware into interactive HTML study guides with per-page screenshots and teacher-style explanations in Chinese.
+Turn PDF courseware into local HTML and Markdown study guides with page screenshots, Chinese explanations, and exam-oriented summaries.
 
 ## Features
 
-- **Render PDF pages** to high-resolution PNG images
-- **Extract text** from PDF for ground truth reference
-- **GPU-accelerated image captioning** (BLIP) for visual content description
-- **AI-powered page analysis** with page-type-aware explanations (text, figure, math, mixed)
-- **Interactive HTML output** with sidebar TOC, per-page explanations, dark mode, and print support
+- Render PDF pages to high-resolution PNG images.
+- Extract per-page text as ground truth.
+- Prepare a visual review queue for GPT/Codex vision.
+- Generate page-by-page Chinese explanations.
+- Support exam mode: formulas, calculation templates, likely questions, and pitfalls.
+- Build local HTML and Markdown outputs.
+
+## Important Vision Policy
+
+This skill does not use BLIP, Hugging Face, torch, transformers, or any local image captioning model.
+
+Visual understanding is done by GPT/Codex directly inspecting rendered page screenshots. The helper script `describe_images.py` only prepares `visual_review_queue.json`; it does not describe images by itself.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install pypdfium2 pdfplumber Pillow
+pip install -r requirements.txt
 
-# (Optional) GPU-accelerated image descriptions
-pip install torch transformers
-
-# Run the pipeline
-PDF="path/to/your/courseware.pdf"
+PDF="path/to/courseware.pdf"
 SKILL_DIR="path/to/pdf-study"
+OUT_DIR="${PDF%.pdf}_study"
 
-# Step 1a: Render to images
-python "$SKILL_DIR/scripts/pdf_to_images.py" "$PDF" "${PDF%.pdf}_study/images" 2.0
+python "$SKILL_DIR/scripts/pdf_to_images.py" "$PDF" "$OUT_DIR/images" 2.0
+python "$SKILL_DIR/scripts/extract_text.py" "$PDF" "$OUT_DIR/data"
+python "$SKILL_DIR/scripts/describe_images.py" "$OUT_DIR" --all
 
-# Step 1b: Extract text
-python "$SKILL_DIR/scripts/extract_text.py" "$PDF" "${PDF%.pdf}_study/data"
-
-# Step 1c: (Optional) GPU image descriptions
-python "$SKILL_DIR/scripts/describe_images.py" "${PDF%.pdf}_study"
-
-# Step 2: Generate page analyses (requires Claude or manual authoring)
-# See SKILL.md for the analysis format
-
-# Step 3: Build HTML
-python "$SKILL_DIR/scripts/build_html.py" "${PDF%.pdf}_study"
+# Then the assistant reads page_text.json, visual_review_queue.json, and selected/all PNGs with GPT vision,
+# writes data/batch_*.json, and builds outputs:
+python "$SKILL_DIR/scripts/build_html.py" "$OUT_DIR"
+python "$SKILL_DIR/scripts/build_md.py" "$OUT_DIR"
 ```
 
 ## Output Structure
 
 ```
 <courseware>_study/
-├── <courseware>_study.html    # Final study guide (open in browser)
-├── images/
-│   ├── page_000.png           # Screenshot of each page
-│   └── ...
-└── data/
-    ├── extracted_text.txt
-    ├── page_text.json
-    ├── image_descriptions.json
-    ├── analyses.json
-    └── pages_text/
+|-- <courseware>_study.html
+|-- <courseware>_study.md
+|-- images/
+|   |-- page_000.png
+|   `-- ...
+`-- data/
+    |-- extracted_text.txt
+    |-- page_text.json
+    |-- visual_review_queue.json
+    |-- image_descriptions.json
+    |-- analyses.json
+    `-- pages_text/
 ```
 
-## Workflow
+## Analysis JSON
 
-The pipeline consists of 4 steps:
+Each batch file should contain a list of pages:
 
-| Step | Description | Time (50 pages) |
-|------|-------------|------------------|
-| 1a | Render PDF to PNGs | ~2s |
-| 1b | Extract text from PDF | ~1.5s |
-| 1c | (Optional) GPU image descriptions | ~25s (CUDA) |
-| 2 | AI page analysis | ~2-5min (inline) |
-| 3 | Build final HTML | <0.1s |
+```json
+[
+  {
+    "page": 1,
+    "type": "mixed",
+    "overview": "本页介绍 cache 地址如何拆成 tag、index 和 offset。",
+    "sections": [
+      ["内容讲解", "..."],
+      ["图表详解", "..."],
+      ["公式解读", "..."],
+      ["考试重点", "..."]
+    ],
+    "exam": {
+      "formulas": ["offset bits = log2(block size)"],
+      "calculation_templates": ["先算 offset，再算 index，最后算 tag。"],
+      "pitfalls": ["Tag 不是 Data 的一部分。"],
+      "likely_questions": ["给地址和 cache 参数，求 tag/index/offset。"]
+    }
+  }
+]
+```
 
 ## Dependencies
 
-- **pypdfium2** — PDF rendering
-- **pdfplumber** — Text extraction
-- **Pillow** — Image processing
-- **torch + transformers** — (Optional, for GPU image captioning)
+- pypdfium2: PDF rendering
+- pdfplumber: text extraction
+- Pillow: image handling
 
 ## License
 

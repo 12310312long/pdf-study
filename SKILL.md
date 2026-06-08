@@ -1,17 +1,21 @@
 ---
 name: pdf-study
 description: |
-  Use when the user provides a PDF of courseware/slides and wants to study it page-by-page with AI explanations.
-  Triggers: "analyze this PDF", "help me study this lecture", "explain each page of this PDF",
-  "convert this PDF to study notes", "生成学习笔记", "帮我复习这个课件", "讲解这个PDF", "/pdf-study",
-  or anytime a user uploads/mentions a PDF and asks for explanations, study aids, or learning materials.
-  Works globally — not tied to any specific project directory.
-compatibility: "Requires pypdfium2, pdfplumber, Pillow. GPU acceleration requires torch + transformers (auto-fallback to CPU if unavailable). Install: pip install pypdfium2 pdfplumber Pillow"
+  Use when the user provides or mentions a PDF of courseware/slides and wants to study it, explain it page by page, convert it to notes, or generate an exam-oriented review guide.
+  Triggers: "analyze this PDF", "help me study this lecture", "explain each page of this PDF", "convert this PDF to study notes", "生成学习笔记", "帮我复习这个课件", "讲解这个PDF", "考前复习", "计算题速查", "/pdf-study".
+  Works globally; not tied to any specific project directory.
+compatibility: "Requires pypdfium2, pdfplumber, Pillow. No local vision model is used. Visual understanding is done by GPT/Codex multimodal image inspection over rendered page screenshots."
 ---
 
-# PDF Study — 课件复习助手
+# PDF Study - 课件复习助手
 
-Turn a PDF courseware into an interactive HTML study guide (plus optional Markdown export) with per-page screenshots and teacher-style explanations in Chinese.
+Turn a PDF courseware file into a local HTML and Markdown study guide with page screenshots, Chinese explanations, and optional exam-oriented summaries.
+
+## Core Principle
+
+Use GPT/Codex vision for page images. Do not use BLIP, Hugging Face, torch, transformers, or any local captioning model for visual understanding.
+
+The scripts only render pages, extract text, prepare a visual review queue, and build final artifacts. The actual visual interpretation is performed by the assistant using its image-reading capability on the rendered PNG pages.
 
 ## Output Structure
 
@@ -19,158 +23,131 @@ Create a folder next to the original PDF:
 
 ```
 <original_name>_study/
-├── <original_name>_study.html    # Final HTML (images loaded locally, not base64)
-├── <original_name>_study.md      # Markdown version (same content, portable)
-├── images/
-│   ├── page_000.png
-│   └── ...
-└── data/
-    ├── extracted_text.txt
-    ├── page_text.json
-    ├── image_descriptions.json   # GPU-generated
-    ├── analyses.json
-    └── pages_text/               # Per-page text files
+|-- <original_name>_study.html
+|-- <original_name>_study.md
+|-- images/
+|   |-- page_000.png
+|   |-- page_001.png
+|   `-- ...
+`-- data/
+    |-- extracted_text.txt
+    |-- page_text.json
+    |-- visual_review_queue.json
+    |-- image_descriptions.json
+    |-- batch_1.json
+    |-- analyses.json
+    `-- pages_text/
 ```
 
-## Workflow (target: under 3 minutes for 50-page PDF)
+## Workflow
 
-### Step 1: Setup (render + extract + GPU describe)
+### Step 1: Render and Extract
 
 ```bash
 PDF="<pdf_path>"
 OUT_DIR="${PDF%.pdf}_study"
+SKILL_DIR="<skill-dir>"
 
-# 1a. Render all pages to images
-python "<skill-dir>/scripts/pdf_to_images.py" "$PDF" "$OUT_DIR/images" 2.0
-
-# 1b. Extract text for ground truth
-python "<skill-dir>/scripts/extract_text.py" "$PDF" "$OUT_DIR/data"
+python "$SKILL_DIR/scripts/pdf_to_images.py" "$PDF" "$OUT_DIR/images" 2.0
+python "$SKILL_DIR/scripts/extract_text.py" "$PDF" "$OUT_DIR/data"
+python "$SKILL_DIR/scripts/describe_images.py" "$OUT_DIR" --all
 ```
 
-### Step 1c: GPU image descriptions (NEW — solves image reading for agents)
+`describe_images.py` is intentionally not an image captioning model. It prepares `data/visual_review_queue.json` so the assistant knows which rendered PNGs to inspect with GPT vision.
 
-```bash
-python "<skill-dir>/scripts/describe_images.py" "$OUT_DIR"
+### Step 2: GPT Vision Review
+
+Read:
+
+- `data/page_text.json`
+- `data/visual_review_queue.json`
+- rendered images under `images/page_*.png`
+
+For each page that has diagrams, equations, tables, screenshots, cache/pipeline layouts, memory hierarchy figures, or weak extracted text, inspect the PNG using GPT/Codex vision. Save concise visual notes to `data/image_descriptions.json` using 0-indexed page keys:
+
+```json
+{
+  "0": "Cover slide for cache lecture; title and instructor metadata.",
+  "12": "Diagram compares direct mapped, set associative, and fully associative cache placement."
+}
 ```
 
-Uses `Salesforce/blip-image-captioning-large` (local vision model, ~1.5GB download on first use) to generate descriptions of every page image. Agents receive these descriptions as text — they never need to read image files.
+If the page is text-only and the extracted text is sufficient, the visual note may be empty.
 
-- **First run:** downloads model (~1-2 minutes one-time, ~1.5GB)
-- **Subsequent runs:** loads from cache (~5 seconds)
-- **GPU:** ~1-2 seconds per page on NVIDIA GPU
-- **CPU fallback:** works without GPU, ~10-15 sec/page (functional but slower)
-- **Failure:** outputs empty JSON, pipeline degrades gracefully to text-only analysis
-- **Output:** `data/image_descriptions.json`
+### Step 3: Generate Analyses
 
-Options: `--device cpu` to force CPU, `--skip-text-heavy` to skip pages with >300 chars of extracted text.
-
-### Step 2: Inline analysis (all pages in main conversation)
-
-**Read the data files, then generate analyses page-by-page directly in the current conversation.**
-**No sub-agents. No file permissions issues. No cold-start overhead.**
-
-**Procedure:**
-
-1. Read `data/page_text.json` — dict of string page keys to extracted text
-2. Read `data/image_descriptions.json` — dict of string page keys to image description
-3. Classify each page (type, overview text) based on the extracted text
-4. Divide pages into 2-3 batches (15-25 pages each, to keep output length manageable)
-5. For each batch, generate the full JSON and write with the Write tool to `data/batch_N.json`
-
-**Page type classification (classify EACH page before writing):**
-
-| Type | Detection | Minimum Sections | Minimum Total Chars |
-|------|-----------|-----------------|---------------------|
-| simple | Title, divider, outline, thank-you, blank | 2 (内容讲解 + 背景知识) | 400 |
-| text | Mainly text, no figures/diagrams | 2 (内容讲解 + 背景知识/补充说明) | 500 |
-| figure | Has diagrams, charts, screenshots, photos | 3 (内容讲解 + 图表详解 + one other) | 700 |
-| math | Has formulas, equations | 2 (内容讲解 + 公式解读) | 550 |
-| mixed | Has both figures AND formulas | 4 (内容讲解 + 图表详解 + 公式解读 + one other) | 800 |
-
-**Section types — use only what fits the page:**
-
-| Section | When Required | Content Guidelines |
-|---------|---------------|-------------------|
-| 内容讲解 | ALWAYS | Core explanation in Chinese. 200-400 chars. Provide in-depth analysis, not just rephrasing the slide. |
-| 图表详解 | REQUIRED for figure/mixed pages | Describe position, visual elements, significance of each figure/diagram. Reference the image description. 150-300 chars. |
-| 公式解读 | REQUIRED for math/mixed pages | Explain each formula's meaning, variables, and intuition. 150-300 chars. |
-| 背景知识 | Recommended for text/simple pages | Broader context, historical background, real-world connections. 120-250 chars. |
-| 重点标注 | Optional — exam-critical points only | Use sparingly (max 2 pages per batch). 80-150 chars. |
-| 补充说明 | Optional — nuances, misconceptions | Use when there is a subtle point worth clarifying. 120-250 chars. |
-
-**Output format (page numbers MUST be 1-indexed):**
+Generate `data/batch_N.json` files in this format. Page numbers must be 1-indexed.
 
 ```json
 [
   {
     "page": 1,
-    "overview": "页面概览（2-4句中文，80-150字）",
+    "type": "simple|text|figure|math|mixed|exercise",
+    "overview": "80-150字中文概览。",
     "sections": [
-      ["内容讲解", "核心解释...（200-400字）"],
-      ...
-    ]
+      ["内容讲解", "核心解释，不能只是复述幻灯片。"],
+      ["图表详解", "当页面有图、表、流程图、截图时必须写。"],
+      ["公式解读", "当页面有公式、计算流程时必须写。"],
+      ["考试重点", "只写真正可能考的点。"],
+      ["易错点", "指出常见误解和判题陷阱。"],
+      ["计算题模板", "给出可套用的步骤或公式。"]
+    ],
+    "exam": {
+      "formulas": ["可选：本页公式"],
+      "calculation_templates": ["可选：计算题步骤"],
+      "pitfalls": ["可选：易错点"],
+      "likely_questions": ["可选：可能考法"]
+    }
   }
 ]
 ```
 
-**OUTPUT VALIDATION before writing each batch:**
-1. Every page has overview (80-150 chars)
-2. Every page meets its type's minimum section count
-3. Every page meets its type's minimum total character count
-4. NO ASCII double quotes (`"`) inside string values — use「」instead
-5. Valid JSON — every `"` is structural
-6. Page numbers are 1-indexed (first page = 1, not 0)
+### Page Type Requirements
 
-### Step 3: Merge + Build HTML
+| Type | Use When | Minimum Sections | Minimum Content |
+|---|---|---:|---:|
+| simple | cover, outline, divider, blank, thanks | 2 | 300 Chinese chars |
+| text | mainly text | 2 | 450 Chinese chars |
+| figure | diagram/table/screenshot heavy | 3, including 图表详解 | 650 Chinese chars |
+| math | formulas/equations/calculation | 3, including 公式解读 | 600 Chinese chars |
+| mixed | figures plus formulas | 4, including 图表详解 and 公式解读 | 750 Chinese chars |
+| exercise | worked example/homework/textbook question | 4, including 计算题模板 and 易错点 | 750 Chinese chars |
+
+## Exam Mode
+
+Use exam mode when the user says: 考试, 考前, 复习, 速查, 计算题, textbook, homework, quiz, final, midterm.
+
+In exam mode, add these sections whenever relevant:
+
+- `公式速查`: formulas with variables explained.
+- `计算题模板`: step-by-step method that can be reused.
+- `判题信号`: how to recognize the problem type from wording.
+- `易错点`: traps such as units, index vs offset, local vs global miss rate.
+- `一眼结论`: one short sentence for last-minute memory.
+
+For Computer Organization, prioritize:
+
+- Cache address breakdown, hit/miss traces, AMAT/CPI.
+- Pipeline hazards, forwarding, stalls, structural hazards.
+- Virtual memory VA to PA, TLB/page table, page offset.
+- Amdahl's law and speedup limits.
+- Hamming/ECC parity and syndrome calculations.
+- Parallel speedup/efficiency if present.
+
+## Build Artifacts
 
 ```bash
-python "<skill-dir>/scripts/build_html.py" "$OUT_DIR"
+python "$SKILL_DIR/scripts/build_html.py" "$OUT_DIR"
+python "$SKILL_DIR/scripts/build_md.py" "$OUT_DIR"
 ```
 
-### Step 3b (可选): Build Markdown
+Report the output folder, page count, generated files, and any validation warnings.
 
-在 HTML 生成之后（或直接基于 `data/batch_*.json`）输出一份 Markdown 版本：
+## Quality Rules
 
-```bash
-python "<skill-dir>/scripts/build_md.py" "$OUT_DIR"
-```
-
-Markdown 文件与 HTML 文件同级，位于 `<original_name>_study.md`，包含相同的逐页讲解、图片引用和课程总结，适合在 Obsidian、GitHub 等 Markdown 编辑器中查看。
-
-### Step 3 补充: build_html.py 做了什么
-
-`build_html.py` 的步骤：
-1. Merges all `data/batch_*.json` into `data/analyses.json`
-2. Validates page quality — warns if any non-skip page has <200 chars of analysis
-3. Reads the template from `<skill-dir>/assets/template.html`
-4. Generates the summary (extracts key points from analyses)
-5. Builds the final HTML with `<img src="images/page_NNN.png">` references
-
-### Step 4: Report
-
-Tell the user: output folder, page count, total analysis sections, any quality warnings, and that both HTML and Markdown study guides are ready (if Markdown was generated).
-
-## Analysis Guidelines
-
-**Language:** Chinese (中文) with English technical terms preserved.
-
-**Depth by page type** (hard minimums — MUST meet these):
-
-| Page Type | Sections | Total Chars |
-|-----------|----------|-------------|
-| Cover/title/outline/divider | 2 (内容讲解 + 背景知识) | ≥400 |
-| Text-only content | 2 (内容讲解 + 背景知识/补充说明) | ≥500 |
-| Content with figures | 3 (内容讲解 + 图表详解 + one other) | ≥700 |
-| Math/formula pages | 2 (内容讲解 + 公式解读) | ≥550 |
-| Mixed (figures + math) | 4 (all four core sections) | ≥800 |
-
-## Tips
-
-- **Dividing pages into batches** — 2-3 batches of 15-25 pages each. Write each as `data/batch_N.json` with the Write tool. Batch JSONs are merged by `build_html.py` automatically.
-- **GPU image descriptions** — do not read PNG images. Use `image_descriptions.json` for `图表详解` sections. If BLIP fails (empty JSON), fall back to text-only analysis.
-- **First run downloads BLIP** — ~1.5GB one-time download (cached to HF_HOME). Subsequent runs load from cache.
-- **GPU acceleration** — BLIP on CUDA does ~1-2 sec/page. Without GPU, CPU fallback is ~10-15 sec/page. Use `--device cpu` to force CPU mode.
-- **JSON quoting** — use「」(corner brackets) instead of `"` inside string values to avoid JSON parse errors.
-- **Images use local paths** (`images/page_000.png`), not base64. Keeps HTML small (~200KB vs ~28MB). Note: image filenames are 0-indexed (page_000.png = page 1).
-- **The bundled scripts** in `scripts/` are the single source of truth. Don't rewrite them.
-- **Dependencies:** `pip install pypdfium2 pdfplumber Pillow torch transformers`
+- Explain in Chinese, preserve English technical terms.
+- Do not invent slide content. Use extracted text plus GPT vision notes.
+- Keep page numbers 1-indexed in `batch_N.json`; image filenames remain 0-indexed.
+- Prefer structured formulas and reusable calculation steps over long prose in exam mode.
+- If visual inspection was skipped for a figure-heavy page, say so in the report.
+- Avoid ASCII double quotes inside JSON string values when possible; use Chinese corner brackets if quoting terms.

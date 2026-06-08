@@ -1,5 +1,3 @@
 pypdfium2
 pdfplumber
 Pillow
-torch
-transformers
